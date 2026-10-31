@@ -23,10 +23,9 @@ s=s.replace(mark,'''    nonisolated func netServiceDidPublish(_ sender: NetServi
     }
 
     nonisolated func netService(_ sender: NetService, didNotPublish errorDict: [String: NSNumber]) {
-        let errorCode = errorDict[NetServicesErrorCode]?.intValue ?? -1
-        let errorDomain = errorDict[NetServicesErrorDomain]?.intValue ?? -1
+        let failureDetails = errorDict.description
         Task { @MainActor [weak self] in
-            self?.record("Bonjour PUBLISH FAILED: code=\\(errorCode) domain=\\(errorDomain)")
+            self?.record("Bonjour PUBLISH FAILED: \\(failureDetails)")
         }
     }
 
