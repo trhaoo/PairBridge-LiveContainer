@@ -1,4 +1,4 @@
-name: Build PairBridge IPA with StikPair engine
+name: Build PairBridge v2 (StikPair background audio fix)
 
 on:
   push:
@@ -33,7 +33,7 @@ jobs:
           test "$(git -C upstream rev-parse HEAD)" = "d9661c505130a7b710225fb8ed61128527b46c7e"
           test -f upstream/rust/include/stikpair.h
 
-      - name: Apply PairBridge branding and PIN notification patch
+      - name: Apply StikPair background audio and real PIN notification fixes
         run: |
           python3 - <<'PY'
           import plistlib
@@ -52,8 +52,25 @@ jobs:
           controller = root / 'App/PairingController.swift'
           swift = controller.read_text()
           assert 'if keepAliveAudio || keepAliveLocation {' in swift
+          assert 'UserDefaults.standard.bool(forKey: "keepAlive.audio")' in swift
+          # Keep silent audio active by default on the first launch: critical
+          # when leaving LiveContainer to open Settings on the same iPhone.
+          swift = swift.replace(
+              'UserDefaults.standard.bool(forKey: "keepAlive.audio")',
+              '(UserDefaults.standard.object(forKey: "keepAlive.audio") == nil ? true : UserDefaults.standard.bool(forKey: "keepAlive.audio"))'
+          )
+          # Deliver the real PIN callback via notifications regardless of the
+          # currently selected keep-alive method.
           swift = swift.replace('if keepAliveAudio || keepAliveLocation {', 'if true {')
           controller.write_text(swift)
+          # Explain the timing and keep-alive requirement inside the app.
+          screen = root / 'App/ContentView.swift'
+          ui = screen.read_text()
+          assert 'Text("Waiting for a device to connect…")' in ui
+          ui = ui.replace('Text("Waiting for a device to connect…")',
+                          'Text("Waiting for a device to connect…")\\n                Text("Keep Silent audio enabled; after starting, open Settings to request the six-digit code. The code appears only after a real connection.")\\n                    .font(.caption)\\n                    .foregroundStyle(.secondary)\\n                    .multilineTextAlignment(.center)')
+          assert 'Toggle("Silent audio", isOn: $controller.keepAliveAudio)' in ui
+          screen.write_text(ui)
           PY
 
       - name: Install iOS Rust targets and XcodeGen
@@ -88,7 +105,7 @@ jobs:
           mkdir -p output/Payload
           cp -R upstream/build/dd/Build/Products/Release-iphoneos/StikPair.app output/Payload/PairBridge.app
           cp upstream/LICENSE output/Payload/PairBridge.app/STIKPAIR_LICENSE.txt
-          (cd output && zip -qry ../PairBridge-unsigned.ipa Payload)
+          (cd output && zip -qry ../StikPair-Fix-v2-unsigned.ipa Payload)
           unzip -t PairBridge-unsigned.ipa | tail -n 2
           test -s PairBridge-unsigned.ipa
 
@@ -96,7 +113,7 @@ jobs:
         if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: PairBridge-unsigned-IPA
+          name: StikPair-Fix-v2-unsigned-IPA
           path: PairBridge-unsigned.ipa
           retention-days: 7
           if-no-files-found: error
