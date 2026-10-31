@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>CFBundleIdentifier</key><string>org.stikpair.ios16bridge</string>
+  <key>CFBundleName</key><string>StikPair Bridge</string>
+  <key>CFBundleDisplayName</key><string>StikPair iOS16</string>
+  <key>CFBundleExecutable</key><string>StikPairBridge</string>
+  <key>CFBundlePackageType</key><string>APPL</string>
+  <key>CFBundleInfoDictionaryVersion</key><string>6.0</string>
+  <key>CFBundleShortVersionString</key><string>1.0</string>
+  <key>CFBundleVersion</key><string>1</string>
+  <key>MinimumOSVersion</key><string>16.0</string>
+  <key>LSRequiresIPhoneOS</key><true/>
+  <key>UIDeviceFamily</key><array><integer>1</integer></array>
+  <key>UIRequiredDeviceCapabilities</key><array><string>arm64</string></array>
+  <key>UISupportedInterfaceOrientations</key>
+  <array><string>UIInterfaceOrientationPortrait</string></array>
+  <key>NSLocalNetworkUsageDescription</key>
+  <string>Cho phép StikPair quảng bá máy chủ ghép đôi trên Wi-Fi để iPhone chính kết nối.</string>
+  <key>NSBonjourServices</key>
+  <array>
+    <string>_remotepairing-pairable-host._tcp</string>
+    <string>_stikpairprobe._tcp</string>
+  </array>
+  <key>NSAppTransportSecurity</key>
+  <dict><key>NSAllowsLocalNetworking</key><true/></dict>
+  <key>UIFileSharingEnabled</key><true/>
+  <key>LSSupportsOpeningDocumentsInPlace</key><true/>
+  <key>UIRequiresFullScreen</key><true/>
+</dict>
+</plist>
