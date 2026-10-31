@@ -106,15 +106,15 @@ jobs:
           cp -R upstream/build/dd/Build/Products/Release-iphoneos/StikPair.app output/Payload/PairBridge.app
           cp upstream/LICENSE output/Payload/PairBridge.app/STIKPAIR_LICENSE.txt
           (cd output && zip -qry ../StikPair-Fix-v2-unsigned.ipa Payload)
-          unzip -t PairBridge-unsigned.ipa | tail -n 2
-          test -s PairBridge-unsigned.ipa
+          unzip -t StikPair-Fix-v2-unsigned.ipa | tail -n 2
+          test -s StikPair-Fix-v2-unsigned.ipa
 
       - name: Upload IPA
         if: success()
         uses: actions/upload-artifact@v4
         with:
           name: StikPair-Fix-v2-unsigned-IPA
-          path: PairBridge-unsigned.ipa
+          path: StikPair-Fix-v2-unsigned.ipa
           retention-days: 7
           if-no-files-found: error
 
