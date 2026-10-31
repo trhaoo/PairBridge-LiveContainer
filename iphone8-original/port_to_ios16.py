@@ -216,6 +216,9 @@ s=s.replace("Text(\"Enable one or more of these if the Live Activity doesn't sta
 # Newer SwiftUI default values and iOS17+ Preview macro should not be required
 if '#Preview {' in s:
     s=s[:s.index('#Preview {')].rstrip()+"\n"
+s=s.replace('.glassEffect(.regular, in: .rect(cornerRadius: 20))', '.background(.regularMaterial, in: RoundedRectangle(cornerRadius: 20))')
+s=s.replace('.glassEffect(.regular, in: .rect(cornerRadius: 16))', '.background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16))')
+s=s.replace('.glassEffect(.regular, in: .capsule)', '.background(.regularMaterial, in: Capsule())')
 assert '.glassEffect(' not in s
 assert '.buttonStyle(.glass)' not in s
 ui.write_text(s)
