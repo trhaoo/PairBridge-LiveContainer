@@ -68,7 +68,7 @@ jobs:
           set -euo pipefail
           mkdir -p output/Payload
           cp -R upstream/build/dd/Build/Products/Release-iphoneos/StikPair.app output/Payload/StikPairFix.app
-          cp upstream/LICENSE output/Payload/PairBridge.app/STIKPAIR_LICENSE.txt
+          cp upstream/LICENSE output/Payload/StikPairFix.app/STIKPAIR_LICENSE.txt
           (cd output && zip -qry ../StikPair-Fix-v3-unsigned.ipa Payload)
           unzip -t StikPair-Fix-v3-unsigned.ipa | tail -n 2
           test -s StikPair-Fix-v3-unsigned.ipa
