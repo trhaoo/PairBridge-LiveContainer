@@ -30,11 +30,12 @@ jobs:
       - name: Port original SwiftUI app to iOS16 and adapt Rust listener
         run: |
           set -euo pipefail
+          python3 -m py_compile iphone8-original/port_to_ios16.py
           python3 iphone8-original/port_to_ios16.py
           python3 iphone8-host/patch_tcp_diagnostics.py
           python3 iphone8-host/patch_dualstack.py
           grep -F 'iOS: "16.0"' upstream/project.yml
-          grep -F 'BGContinuedProcessingTask' upstream/App/PairingController.swift && exit 1 || true
+          grep -F 'import BackgroundTasks' upstream/App/PairingController.swift && exit 1 || true
 
       - name: Install Rust targets and XcodeGen
         run: |
