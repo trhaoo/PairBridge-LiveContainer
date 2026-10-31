@@ -1,4 +1,4 @@
-name: Package StikPair 1.2.0 iOS16 complete source
+name: Package StikPair 1.2.0 iOS16 v2 complete source
 
 on:
   push:
@@ -29,6 +29,7 @@ jobs:
         run: |
           set -euo pipefail
           python3 iphone8-original/port_to_ios16.py
+          python3 iphone8-original/patch_foreground_bonjour.py
           python3 iphone8-host/patch_tcp_diagnostics.py
           python3 iphone8-host/patch_dualstack.py
 
@@ -39,7 +40,7 @@ jobs:
           mkdir -p iOS16-Source
           mv upstream iOS16-Source/StikPair
           mkdir -p iOS16-Source/Patches
-          cp iphone8-original/port_to_ios16.py iphone8-host/patch_tcp_diagnostics.py iphone8-host/patch_dualstack.py iOS16-Source/Patches/
+          cp iphone8-original/port_to_ios16.py iphone8-original/patch_foreground_bonjour.py iphone8-host/patch_tcp_diagnostics.py iphone8-host/patch_dualstack.py iOS16-Source/Patches/
           cat > iOS16-Source/README.txt <<'EOF'
           StikPair 1.2.0 ported to iOS 16; original upstream StikDebug/StikPair
           pinned commit d9661c505130a7b710225fb8ed61128527b46c7e.
@@ -51,13 +52,13 @@ jobs:
           while retaining iPhone/iPad, Apple TV, Bonjour, PIN, PR export.
           StikPair license included in StikPair/LICENSE.
           EOF
-          zip -qry StikPair-Original-1.2.0-iOS16-Source.zip iOS16-Source
-          unzip -t StikPair-Original-1.2.0-iOS16-Source.zip | tail -n 2
-          test -s StikPair-Original-1.2.0-iOS16-Source.zip
+          zip -qry StikPair-Original-1.2.0-iOS16-v2-Source.zip iOS16-Source
+          unzip -t StikPair-Original-1.2.0-iOS16-v2-Source.zip | tail -n 2
+          test -s StikPair-Original-1.2.0-iOS16-v2-Source.zip
 
       - name: Upload source archive
         uses: actions/upload-artifact@v4
         with:
-          name: StikPair-Original-1.2.0-iOS16-Source
-          path: StikPair-Original-1.2.0-iOS16-Source.zip
+          name: StikPair-Original-1.2.0-iOS16-v2-Source
+          path: StikPair-Original-1.2.0-iOS16-v2-Source.zip
           retention-days: 7
