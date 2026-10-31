@@ -1,9 +1,22 @@
 #!/usr/bin/env python3
 """StikPair v5: preserve silent audio after BG task expiration, log actual TCP accept."""
 from pathlib import Path
+import plistlib
+
+project = Path("upstream/project.yml")
+project_text = project.read_text()
+assert "org.stikpair.fixv3" in project_text
+project.write_text(project_text.replace("org.stikpair.fixv3", "org.stikpair.fixv5"))
+info_path = Path("upstream/App/Info.plist")
+with info_path.open("rb") as f:
+    info = plistlib.load(f)
+info["CFBundleDisplayName"] = "StikPair Fix v5"
+with info_path.open("wb") as f:
+    plistlib.dump(info, f)
 
 swift_path = Path("upstream/App/PairingController.swift")
 s = swift_path.read_text()
+s = s.replace("StikPair-Fix-v3-diagnostics.txt", "StikPair-Fix-v5-diagnostics.txt")
 old = '''                task.expirationHandler = { [weak self] in
                     guard let self = self else { return }
                     self.record("BG processing expired; listener may still be alive but iOS can suspend guest execution")
