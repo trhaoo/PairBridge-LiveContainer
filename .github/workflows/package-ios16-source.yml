@@ -1,0 +1,63 @@
+name: Package StikPair 1.2.0 iOS16 complete source
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/package-ios16-source.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout source port
+        uses: actions/checkout@v4
+
+      - name: Fetch upstream original StikPair 1.2.0
+        run: |
+          set -euo pipefail
+          git clone https://github.com/StikDebug/StikPair.git upstream
+          git -C upstream checkout --detach d9661c505130a7b710225fb8ed61128527b46c7e
+          test "$(git -C upstream rev-parse HEAD)" = "d9661c505130a7b710225fb8ed61128527b46c7e"
+
+      - name: Apply all iOS16 source changes
+        run: |
+          set -euo pipefail
+          python3 iphone8-original/port_to_ios16.py
+          python3 iphone8-host/patch_tcp_diagnostics.py
+          python3 iphone8-host/patch_dualstack.py
+
+      - name: Package ready-to-build patched source
+        run: |
+          set -euo pipefail
+          rm -rf upstream/.git
+          mkdir -p iOS16-Source
+          mv upstream iOS16-Source/StikPair
+          mkdir -p iOS16-Source/Patches
+          cp iphone8-original/port_to_ios16.py iphone8-host/patch_tcp_diagnostics.py iphone8-host/patch_dualstack.py iOS16-Source/Patches/
+          cat > iOS16-Source/README.txt <<'EOF'
+          StikPair 1.2.0 ported to iOS 16; original upstream StikDebug/StikPair
+          pinned commit d9661c505130a7b710225fb8ed61128527b46c7e.
+          Contains complete patched SwiftUI App/, iOS16 project.yml, original
+          resources, Rust FFI source and scripts. Rebuild with Xcode 27,
+          xcodegen, Rust iOS ARM64 targets and StikPair/build-rust.sh.
+          Generated iOS16 IPA bundle ID: org.stikpair.ios16.original.
+          The port adapts unavailable iOS 27 background task and glass styles,
+          while retaining iPhone/iPad, Apple TV, Bonjour, PIN, PR export.
+          StikPair license included in StikPair/LICENSE.
+          EOF
+          zip -qry StikPair-Original-1.2.0-iOS16-Source.zip iOS16-Source
+          unzip -t StikPair-Original-1.2.0-iOS16-Source.zip | tail -n 2
+          test -s StikPair-Original-1.2.0-iOS16-Source.zip
+
+      - name: Upload source archive
+        uses: actions/upload-artifact@v4
+        with:
+          name: StikPair-Original-1.2.0-iOS16-Source
+          path: StikPair-Original-1.2.0-iOS16-Source.zip
+          retention-days: 7
