@@ -1,4 +1,4 @@
-name: Build StikPair Fix v4 (Bonjour diagnostics)
+name: Build StikPair Fix v5 (TCP accept and background fix)
 
 on:
   push:
@@ -34,10 +34,11 @@ jobs:
           test "$(git -C upstream rev-parse HEAD)" = "d9661c505130a7b710225fb8ed61128527b46c7e"
           test -f upstream/rust/include/stikpair.h
 
-      - name: Apply StikPair Fix v3 and v4 patches
+      - name: Apply StikPair Fix v3 v4 and v5 patches
         run: |
           python3 patches/fix_stikpair_v3.py
           python3 patches/fix_stikpair_v4.py
+          python3 patches/fix_stikpair_v5.py
 
       - name: Install iOS Rust targets and XcodeGen
         run: |
@@ -71,16 +72,16 @@ jobs:
           mkdir -p output/Payload
           cp -R upstream/build/dd/Build/Products/Release-iphoneos/StikPair.app output/Payload/StikPairFix.app
           cp upstream/LICENSE output/Payload/StikPairFix.app/STIKPAIR_LICENSE.txt
-          (cd output && zip -qry ../StikPair-Fix-v4-unsigned.ipa Payload)
-          unzip -t StikPair-Fix-v4-unsigned.ipa | tail -n 2
-          test -s StikPair-Fix-v4-unsigned.ipa
+          (cd output && zip -qry ../StikPair-Fix-v5-unsigned.ipa Payload)
+          unzip -t StikPair-Fix-v5-unsigned.ipa | tail -n 2
+          test -s StikPair-Fix-v5-unsigned.ipa
 
       - name: Upload IPA
         if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: StikPair-Fix-v4-unsigned-IPA
-          path: StikPair-Fix-v4-unsigned.ipa
+          name: StikPair-Fix-v5-unsigned-IPA
+          path: StikPair-Fix-v5-unsigned.ipa
           retention-days: 7
           if-no-files-found: error
 
