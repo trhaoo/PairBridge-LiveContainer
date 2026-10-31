@@ -1,0 +1,99 @@
+name: Build original StikPair 1.2.0 source port for iPhone8 iOS16
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/build-stikpair-original-ios16.yml'
+      - 'iphone8-original/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: xcode-27
+    timeout-minutes: 100
+    steps:
+      - name: Checkout iOS16 port source
+        uses: actions/checkout@v4
+
+      - name: Fetch exact original StikPair 1.2.0 source
+        run: |
+          set -euo pipefail
+          git clone https://github.com/StikDebug/StikPair.git upstream
+          git -C upstream checkout --detach d9661c505130a7b710225fb8ed61128527b46c7e
+          test "$(git -C upstream rev-parse HEAD)" = "d9661c505130a7b710225fb8ed61128527b46c7e"
+          test -f upstream/App/PairingController.swift
+
+      - name: Port original SwiftUI app to iOS16 and adapt Rust listener
+        run: |
+          set -euo pipefail
+          python3 iphone8-original/port_to_ios16.py
+          python3 iphone8-host/patch_tcp_diagnostics.py
+          python3 iphone8-host/patch_dualstack.py
+          grep -F 'iOS: "16.0"' upstream/project.yml
+          grep -F 'BGContinuedProcessingTask' upstream/App/PairingController.swift && exit 1 || true
+
+      - name: Install Rust targets and XcodeGen
+        run: |
+          set -euo pipefail
+          rustup target add aarch64-apple-ios aarch64-apple-ios-sim
+          if ! command -v xcodegen >/dev/null 2>&1; then brew install xcodegen; fi
+          xcodebuild -version
+          rustc --version
+
+      - name: Build original StikPair Rust FFI for iOS16
+        working-directory: upstream
+        run: |
+          set -o pipefail
+          IPHONEOS_DEPLOYMENT_TARGET=16.0 DEVELOPER_DIR="$(xcode-select -p)" bash build-rust.sh 2>&1 | tee ../ios16-rust-build.log
+
+      - name: Generate original StikPair Xcode project
+        working-directory: upstream
+        run: xcodegen generate
+
+      - name: Compile original SwiftUI StikPair for iPhone8 iOS16
+        working-directory: upstream
+        run: |
+          set -o pipefail
+          xcodebuild -project StikPair.xcodeproj -scheme StikPair -configuration Release \
+            -sdk iphoneos -destination 'generic/platform=iOS' \
+            -derivedDataPath build/dd IPHONEOS_DEPLOYMENT_TARGET=16.0 \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" \
+            build 2>&1 | tee ../ios16-swift-build.log
+
+      - name: Assemble and ad-hoc sign iOS16 IPA
+        run: |
+          set -euo pipefail
+          mkdir -p output/Payload
+          cp -R upstream/build/dd/Build/Products/Release-iphoneos/StikPair.app output/Payload/StikPair.app
+          cp upstream/LICENSE output/Payload/StikPair.app/STIKPAIR_LICENSE.txt
+          /usr/libexec/PlistBuddy -c 'Print :MinimumOSVersion' output/Payload/StikPair.app/Info.plist
+          test "$(/usr/libexec/PlistBuddy -c 'Print :MinimumOSVersion' output/Payload/StikPair.app/Info.plist)" = "16.0"
+          test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' output/Payload/StikPair.app/Info.plist)" = "org.stikpair.ios16.original"
+          xcrun lipo -archs output/Payload/StikPair.app/StikPair | grep -q arm64
+          codesign --force --sign - --timestamp=none output/Payload/StikPair.app
+          codesign --verify --verbose=2 output/Payload/StikPair.app
+          (cd output && zip -qry ../StikPair-Original-1.2.0-iOS16-iPhone8.ipa Payload)
+          unzip -t StikPair-Original-1.2.0-iOS16-iPhone8.ipa | tail -n 2
+          test -s StikPair-Original-1.2.0-iOS16-iPhone8.ipa
+
+      - name: Upload original StikPair iOS16 IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: StikPair-Original-1.2.0-iOS16-iPhone8-IPA
+          path: StikPair-Original-1.2.0-iOS16-iPhone8.ipa
+          retention-days: 7
+
+      - name: Upload full build logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: StikPair-Original-iOS16-build-logs
+          path: |
+            ios16-rust-build.log
+            ios16-swift-build.log
+          retention-days: 7
+          if-no-files-found: ignore
