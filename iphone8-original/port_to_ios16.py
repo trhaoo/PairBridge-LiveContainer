@@ -14,7 +14,8 @@ assert 'iOS: "27.0"' in s
 assert 'PRODUCT_BUNDLE_IDENTIFIER: com.stik.StikPair' in s
 s=s.replace('iOS: "27.0"','iOS: "16.0"',1)
 s=s.replace('PRODUCT_BUNDLE_IDENTIFIER: com.stik.StikPair','PRODUCT_BUNDLE_IDENTIFIER: org.stikpair.ios16.original',1)
-s=s.replace('MARKETING_VERSION: "1.2.0"','MARKETING_VERSION: "1.2.0-ios16"',1)
+# Keep a numeric marketing version valid on iOS 16 and distinguish build number.
+s=s.replace('CURRENT_PROJECT_VERSION: "1"','CURRENT_PROJECT_VERSION: "16"',1)
 project.write_text(s)
 
 plistpath=root/"App/Info.plist"
@@ -165,6 +166,18 @@ s=s.replace(needle,'''    nonisolated func netServiceDidPublish(_ sender: NetSer
     }
 
 '''+needle,1)
+sub('''    let id = String(cString: serviceID)
+
+    var txt: [String: Data] = [:]''','''    let id = String(cString: serviceID)
+    if id == "__stikpair_tcp_accepted__" {
+        DispatchQueue.main.async {
+            controller.record("TCP CONNECTION ACCEPTED by Rust on port \\(port)")
+        }
+        return
+    }
+
+    var txt: [String: Data] = [:]''')
+
 sub('''    DispatchQueue.main.async {
         controller.startAdvertising(serviceID: id, port: Int32(port), txt: txt)''','''    DispatchQueue.main.async {
         controller.record("Rust READY: port=\\(port), TXT records=\\(count)")
