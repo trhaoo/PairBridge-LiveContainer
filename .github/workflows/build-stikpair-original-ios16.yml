@@ -79,14 +79,14 @@ jobs:
           codesign --force --sign - --timestamp=none output/Payload/StikPair.app
           codesign --verify --verbose=2 output/Payload/StikPair.app
           (cd output && zip -qry ../StikPair-Original-1.2.0-iOS16-iPhone8-v2.ipa Payload)
-          unzip -t StikPair-Original-1.2.0-iOS16-iPhone8.ipa | tail -n 2
-          test -s StikPair-Original-1.2.0-iOS16-iPhone8.ipa
+          unzip -t StikPair-Original-1.2.0-iOS16-iPhone8-v2.ipa | tail -n 2
+          test -s StikPair-Original-1.2.0-iOS16-iPhone8-v2.ipa
 
       - name: Upload original StikPair iOS16 IPA
         uses: actions/upload-artifact@v4
         with:
           name: StikPair-Original-1.2.0-iOS16-iPhone8-v2-IPA
-          path: StikPair-Original-1.2.0-iOS16-iPhone8.ipa
+          path: StikPair-Original-1.2.0-iOS16-iPhone8-v2.ipa
           retention-days: 7
 
       - name: Upload full build logs
