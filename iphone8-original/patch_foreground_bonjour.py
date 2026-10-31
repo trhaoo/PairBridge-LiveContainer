@@ -20,6 +20,7 @@ replace_once(
     private var advertisedPort: Int32 = 0
     private var advertisedTXT: [String: Data] = [:]
     private var bonjourPublished = false
+    private var needsRefreshAfterBackground = false
     private var bonjourRetryCount = 0
     private let localNetwork''')
 
@@ -33,6 +34,7 @@ replace_once(
         ) { [weak self] _ in
             Task { @MainActor in
                 guard let self = self, self.pairingStarted else { return }
+                self.needsRefreshAfterBackground = true
                 self.record("⚠ iPhone 8 moved to BACKGROUND; iOS 16 can suspend the pairing listener")
             }
         }
@@ -43,7 +45,8 @@ replace_once(
             Task { @MainActor in
                 guard let self = self, self.pairingStarted else { return }
                 self.record("iPhone 8 returned to FOREGROUND")
-                if !self.bonjourPublished && self.advertisedServiceID != nil {
+                if (self.needsRefreshAfterBackground || !self.bonjourPublished) && self.advertisedServiceID != nil {
+                    self.needsRefreshAfterBackground = false
                     self.republishBonjour(reason: "returned from background")
                 }
             }
