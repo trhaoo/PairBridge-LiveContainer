@@ -1,0 +1,82 @@
+name: Build iPhone 8 standalone StikPair host (iOS 16)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/build-iphone8-host.yml'
+      - 'iphone8-host/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: xcode-27
+    timeout-minutes: 100
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Fetch pinned genuine StikPair engine
+        run: |
+          set -euo pipefail
+          git clone https://github.com/StikDebug/StikPair.git upstream
+          git -C upstream checkout --detach d9661c505130a7b710225fb8ed61128527b46c7e
+
+      - name: Install iOS ARM64 Rust target
+        run: |
+          set -euo pipefail
+          rustup target add aarch64-apple-ios
+          xcodebuild -version
+          rustc --version
+
+      - name: Compile Rust engine for iOS 16
+        working-directory: upstream/rust
+        run: |
+          set -o pipefail
+          IPHONEOS_DEPLOYMENT_TARGET=16.0 cargo build --release --target aarch64-apple-ios 2>&1 | tee ../../iphone8-rust-build.log
+          test -s target/aarch64-apple-ios/release/libstikpair_ffi.a
+
+      - name: Link standalone command-line host
+        run: |
+          set -euo pipefail
+          SDK="$(xcrun --sdk iphoneos --show-sdk-path)"
+          mkdir -p output
+          xcrun --sdk iphoneos clang -target arm64-apple-ios16.0 \
+            -isysroot "$SDK" -fobjc-arc -O2 \
+            -I upstream/rust/include \
+            iphone8-host/main.m \
+            upstream/rust/target/aarch64-apple-ios/release/libstikpair_ffi.a \
+            -framework Foundation -framework Security -framework SystemConfiguration \
+            -framework CoreFoundation -lresolv -lc++ -lz -liconv \
+            -o output/StikPairHost-iPhone8 2>&1 | tee iphone8-link.log
+          test -s output/StikPairHost-iPhone8
+          file output/StikPairHost-iPhone8
+
+      - name: Package executable
+        run: |
+          set -euo pipefail
+          cp iphone8-host/README.md output/README.md
+          (cd output && zip -9 ../StikPairHost-iPhone8.zip StikPairHost-iPhone8 README.md)
+          unzip -t StikPairHost-iPhone8.zip
+
+      - name: Upload binary artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: StikPairHost-iPhone8-iOS16-arm64
+          path: StikPairHost-iPhone8.zip
+          retention-days: 7
+          if-no-files-found: error
+
+      - name: Upload diagnostic logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: StikPairHost-iPhone8-build-logs
+          path: |
+            iphone8-rust-build.log
+            iphone8-link.log
+          retention-days: 7
+          if-no-files-found: ignore
