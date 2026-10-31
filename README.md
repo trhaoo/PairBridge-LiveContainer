@@ -1,15 +1,16 @@
 # PairBridge for LiveContainer (experimental)
 
-This repository builds an **unsigned iOS IPA** by compiling the **real StikPair Rust RemotePairing engine** and the upstream Swift app, with a PairBridge display name and an always-attempted notification when the genuine pairing PIN arrives.
+This repository builds an **unsigned iOS IPA** by compiling the **real StikPair Rust RemotePairing engine** and the upstream Swift app, with a PairBridge display name and an always-attempted notification when the genuine pairing PIN arrives. The v2 build additionally enables the existing **Silent audio** background mode by default on first launch, to reduce suspension when opening iPhone Settings.
 
 ## Build
-Go to [GitHub Actions](../../actions/workflows/build-pairbridge.yml), select the latest successful run and download the `PairBridge-unsigned-IPA` artifact. Unzip the downloaded artifact ZIP to obtain `PairBridge-unsigned.ipa`.
+Go to [GitHub Actions](../../actions/workflows/build-pairbridge.yml), select the latest successful **v2** run and download the `StikPair-Fix-v2-unsigned-IPA` artifact. Unzip the downloaded artifact ZIP to obtain `StikPair-Fix-v2-unsigned.ipa`.
 
 The build uses GitHub-hosted **Xcode 27**, Rust iOS targets and XcodeGen. Upstream StikPair is pinned to commit `d9661c505130a7b710225fb8ed61128527b46c7e`.
 
 ## Important limitations
 - This is a **real compile pipeline**, not a tested solution for LiveContainer.
 - An IPA generated here **does not guarantee** that LiveContainer 3.8.0 can keep RemotePairing alive while Settings is open, that Bonjour advertising works, or that a valid SideStore pairing record will be created.
+- Keep **Silent audio** enabled in the app, allow Local Network and notification permissions, start pairing, then open **Settings → Privacy & Security → Developer Mode → Pair with StikPair**. This is a best-effort workaround, not a verified LiveContainer fix.
 - A PIN is shown **only when** the real Rust callback provides it; no mock or guessed PINs or pairing files.
 - Do not upload any personal `.rppairing`, `.plist` containing keys, developer `.p12` certificate, provisioning profile, device secrets or credentials to this **public** repository.
 - The IPA is unsigned. Test by importing it into LiveContainer; do **not** delete SideStore or replace an existing working app.
