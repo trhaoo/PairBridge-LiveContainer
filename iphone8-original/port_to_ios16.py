@@ -211,7 +211,7 @@ s=s.replace('''                Text("Waiting for a device to connect…")
                         .textSelection(.enabled)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)''',1)
-s=s.replace('Text("Enable one or more of these if the Live Activity doesn\\'t start.")',
+s=s.replace("Text(\"Enable one or more of these if the Live Activity doesn't start.\")",
 '''Text("On iOS 16, silent audio and location may help while you open Settings on the other phone.")''')
 # Newer SwiftUI default values and iOS17+ Preview macro should not be required
 if '#Preview {' in s:
