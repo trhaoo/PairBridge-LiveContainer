@@ -1,4 +1,4 @@
-name: Build original StikPair 1.2.0 source port for iPhone8 iOS16
+name: Build original StikPair 1.2.0 iOS16 (foreground Bonjour recovery)
 
 on:
   push:
@@ -32,6 +32,7 @@ jobs:
           set -euo pipefail
           python3 -m py_compile iphone8-original/port_to_ios16.py
           python3 iphone8-original/port_to_ios16.py
+          python3 iphone8-original/patch_foreground_bonjour.py
           python3 iphone8-host/patch_tcp_diagnostics.py
           python3 iphone8-host/patch_dualstack.py
           grep -F 'iOS: "16.0"' upstream/project.yml
@@ -77,14 +78,14 @@ jobs:
           xcrun lipo -archs output/Payload/StikPair.app/StikPair | grep -q arm64
           codesign --force --sign - --timestamp=none output/Payload/StikPair.app
           codesign --verify --verbose=2 output/Payload/StikPair.app
-          (cd output && zip -qry ../StikPair-Original-1.2.0-iOS16-iPhone8.ipa Payload)
+          (cd output && zip -qry ../StikPair-Original-1.2.0-iOS16-iPhone8-v2.ipa Payload)
           unzip -t StikPair-Original-1.2.0-iOS16-iPhone8.ipa | tail -n 2
           test -s StikPair-Original-1.2.0-iOS16-iPhone8.ipa
 
       - name: Upload original StikPair iOS16 IPA
         uses: actions/upload-artifact@v4
         with:
-          name: StikPair-Original-1.2.0-iOS16-iPhone8-IPA
+          name: StikPair-Original-1.2.0-iOS16-iPhone8-v2-IPA
           path: StikPair-Original-1.2.0-iOS16-iPhone8.ipa
           retention-days: 7
 
