@@ -68,7 +68,7 @@ jobs:
           ui = screen.read_text()
           assert 'Text("Waiting for a device to connect…")' in ui
           ui = ui.replace('Text("Waiting for a device to connect…")',
-                          'Text("Waiting for a device to connect…")\\n                Text("Keep Silent audio enabled; after starting, open Settings to request the six-digit code. The code appears only after a real connection.")\\n                    .font(.caption)\\n                    .foregroundStyle(.secondary)\\n                    .multilineTextAlignment(.center)')
+                          'Text("Waiting for a device to connect…")\n                Text("Keep Silent audio enabled; after starting, open Settings to request the six-digit code. The code appears only after a real connection.")\n                    .font(.caption)\n                    .foregroundStyle(.secondary)\n                    .multilineTextAlignment(.center)')
           assert 'Toggle("Silent audio", isOn: $controller.keepAliveAudio)' in ui
           screen.write_text(ui)
           PY
