@@ -1,4 +1,4 @@
-name: Build iPhone 8 StikPair host v2 (TCP instrumentation)
+name: Build iPhone 8 StikPair host v3 (IPv4 IPv6 dual-stack)
 
 on:
   push:
@@ -26,7 +26,9 @@ jobs:
           git -C upstream checkout --detach d9661c505130a7b710225fb8ed61128527b46c7e
 
       - name: Add TCP connection diagnostics
-        run: python3 iphone8-host/patch_tcp_diagnostics.py
+        run: |
+          python3 iphone8-host/patch_tcp_diagnostics.py
+          python3 iphone8-host/patch_dualstack.py
 
       - name: Install iOS ARM64 Rust target
         run: |
@@ -67,14 +69,14 @@ jobs:
         run: |
           set -euo pipefail
           cp iphone8-host/README.md output/README.md
-          (cd output && zip -9 ../StikPairHost-iPhone8-v2.zip StikPairHost-iPhone8 Info.plist README.md)
-          unzip -t StikPairHost-iPhone8-v2.zip
+          (cd output && zip -9 ../StikPairHost-iPhone8-v3.zip StikPairHost-iPhone8 Info.plist README.md)
+          unzip -t StikPairHost-iPhone8-v3.zip
 
       - name: Upload binary artifact
         uses: actions/upload-artifact@v4
         with:
-          name: StikPairHost-iPhone8-v2-signed-iOS16-arm64
-          path: StikPairHost-iPhone8-v2.zip
+          name: StikPairHost-iPhone8-v3-signed-iOS16-arm64
+          path: StikPairHost-iPhone8-v3.zip
           retention-days: 7
           if-no-files-found: error
 
