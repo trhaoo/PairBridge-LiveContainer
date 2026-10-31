@@ -1,0 +1,113 @@
+name: Build PairBridge IPA with StikPair engine
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/build-pairbridge.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: xcode-27
+    timeout-minutes: 100
+    steps:
+      - name: Checkout PairBridge repository
+        uses: actions/checkout@v4
+
+      - name: Show Xcode and Rust versions
+        run: |
+          set -euo pipefail
+          xcodebuild -version
+          xcodebuild -showsdks | grep iphoneos
+          rustc --version
+
+      - name: Fetch pinned StikPair source
+        run: |
+          set -euo pipefail
+          git clone https://github.com/StikDebug/StikPair.git upstream
+          git -C upstream checkout --detach d9661c505130a7b710225fb8ed61128527b46c7e
+          test "$(git -C upstream rev-parse HEAD)" = "d9661c505130a7b710225fb8ed61128527b46c7e"
+          test -f upstream/rust/include/stikpair.h
+
+      - name: Apply PairBridge branding and PIN notification patch
+        run: |
+          python3 - <<'PY'
+          import plistlib
+          from pathlib import Path
+          root = Path('upstream')
+          project = root / 'project.yml'
+          source = project.read_text()
+          assert 'com.stik.StikPair' in source
+          project.write_text(source.replace('com.stik.StikPair', 'org.pairbridge.lab'))
+          info = root / 'App/Info.plist'
+          with info.open('rb') as f:
+              data = plistlib.load(f)
+          data['CFBundleDisplayName'] = 'PairBridge'
+          with info.open('wb') as f:
+              plistlib.dump(data, f)
+          controller = root / 'App/PairingController.swift'
+          swift = controller.read_text()
+          assert 'if keepAliveAudio || keepAliveLocation {' in swift
+          swift = swift.replace('if keepAliveAudio || keepAliveLocation {', 'if true {')
+          controller.write_text(swift)
+          PY
+
+      - name: Install iOS Rust targets and XcodeGen
+        run: |
+          set -euo pipefail
+          rustup target add aarch64-apple-ios aarch64-apple-ios-sim
+          if ! command -v xcodegen >/dev/null 2>&1; then brew install xcodegen; fi
+
+      - name: Build Rust StikPairFFI
+        working-directory: upstream
+        run: |
+          set -o pipefail
+          DEVELOPER_DIR="$(xcode-select -p)" bash build-rust.sh 2>&1 | tee ../rust-build.log
+
+      - name: Generate Xcode project
+        working-directory: upstream
+        run: xcodegen generate
+
+      - name: Compile unsigned iOS app
+        working-directory: upstream
+        run: |
+          set -o pipefail
+          xcodebuild -project StikPair.xcodeproj -scheme StikPair -configuration Release \
+            -sdk iphoneos -destination 'generic/platform=iOS' \
+            -derivedDataPath build/dd CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" CODE_SIGN_ENTITLEMENTS="" \
+            build 2>&1 | tee ../ios-build.log
+
+      - name: Package IPA
+        run: |
+          set -euo pipefail
+          mkdir -p output/Payload
+          cp -R upstream/build/dd/Build/Products/Release-iphoneos/StikPair.app output/Payload/PairBridge.app
+          cp upstream/LICENSE output/Payload/PairBridge.app/STIKPAIR_LICENSE.txt
+          (cd output && zip -qry ../PairBridge-unsigned.ipa Payload)
+          unzip -t PairBridge-unsigned.ipa | tail -n 2
+          test -s PairBridge-unsigned.ipa
+
+      - name: Upload IPA
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: PairBridge-unsigned-IPA
+          path: PairBridge-unsigned.ipa
+          retention-days: 7
+          if-no-files-found: error
+
+      - name: Upload build logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: PairBridge-build-logs
+          path: |
+            rust-build.log
+            ios-build.log
+          retention-days: 7
+          if-no-files-found: ignore
