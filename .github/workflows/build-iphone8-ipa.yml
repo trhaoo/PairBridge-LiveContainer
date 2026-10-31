@@ -1,0 +1,103 @@
+name: Build StikPair Bridge iOS16 IPA for iPhone8
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/build-iphone8-ipa.yml'
+      - 'iphone8-ipa/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-ios16-ipa:
+    runs-on: xcode-27
+    timeout-minutes: 100
+    steps:
+      - name: Checkout project
+        uses: actions/checkout@v4
+
+      - name: Fetch pinned genuine StikPair RemotePairing engine
+        run: |
+          set -euo pipefail
+          git clone https://github.com/StikDebug/StikPair.git upstream
+          git -C upstream checkout --detach d9661c505130a7b710225fb8ed61128527b46c7e
+          test -f upstream/rust/include/stikpair.h
+
+      - name: Apply verified TCP diagnostics and IPv4 plus IPv6 listener
+        run: |
+          set -euo pipefail
+          python3 iphone8-host/patch_tcp_diagnostics.py
+          python3 iphone8-host/patch_dualstack.py
+
+      - name: Install Rust iPhone ARM64 target
+        run: |
+          set -euo pipefail
+          rustup target add aarch64-apple-ios
+          xcodebuild -version
+          rustc --version
+
+      - name: Build native StikPair RemotePairing engine for iOS16
+        working-directory: upstream/rust
+        run: |
+          set -o pipefail
+          IPHONEOS_DEPLOYMENT_TARGET=16.0 cargo build --release --target aarch64-apple-ios 2>&1 | tee ../../iphone8-ipa-rust-build.log
+          test -s target/aarch64-apple-ios/release/libstikpair_ffi.a
+
+      - name: Build UIKit iOS16 app without a Mac on the user's side
+        run: |
+          set -euo pipefail
+          SDK="$(xcrun --sdk iphoneos --show-sdk-path)"
+          mkdir -p output/Payload/StikPairBridge.app
+          xcrun --sdk iphoneos clang -target arm64-apple-ios16.0 \
+            -isysroot "$SDK" -fobjc-arc -O2 \
+            -I upstream/rust/include \
+            iphone8-ipa/main.m \
+            upstream/rust/target/aarch64-apple-ios/release/libstikpair_ffi.a \
+            -framework UIKit -framework Foundation -framework Security \
+            -framework SystemConfiguration -framework CoreFoundation \
+            -lresolv -lc++ -lz -liconv \
+            -o output/Payload/StikPairBridge.app/StikPairBridge \
+            2>&1 | tee iphone8-ipa-link.log
+          cp iphone8-ipa/Info.plist output/Payload/StikPairBridge.app/Info.plist
+          plutil -lint output/Payload/StikPairBridge.app/Info.plist
+          /usr/libexec/PlistBuddy -c 'Print :MinimumOSVersion' output/Payload/StikPairBridge.app/Info.plist
+          xcrun lipo -archs output/Payload/StikPairBridge.app/StikPairBridge
+
+      - name: Ad-hoc code sign and verify standalone IPA app
+        run: |
+          set -euo pipefail
+          codesign --force --sign - --timestamp=none output/Payload/StikPairBridge.app
+          codesign --verify --verbose=2 output/Payload/StikPairBridge.app
+          codesign -dvvv output/Payload/StikPairBridge.app 2>&1 | tee iphone8-ipa-sign.log
+
+      - name: Package and verify installable IPA archive structure
+        run: |
+          set -euo pipefail
+          (cd output && zip -qry ../StikPair-Bridge-iOS16-iPhone8.ipa Payload)
+          unzip -t StikPair-Bridge-iOS16-iPhone8.ipa | tail -n 3
+          unzip -l StikPair-Bridge-iOS16-iPhone8.ipa | grep 'Payload/StikPairBridge.app/StikPairBridge'
+          unzip -l StikPair-Bridge-iOS16-iPhone8.ipa | grep 'Payload/StikPairBridge.app/Info.plist'
+          test -s StikPair-Bridge-iOS16-iPhone8.ipa
+
+      - name: Upload StikPair Bridge iOS16 IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: StikPair-Bridge-iOS16-iPhone8-IPA
+          path: StikPair-Bridge-iOS16-iPhone8.ipa
+          retention-days: 7
+          if-no-files-found: error
+
+      - name: Upload build logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: StikPair-Bridge-iOS16-build-logs
+          path: |
+            iphone8-ipa-rust-build.log
+            iphone8-ipa-link.log
+            iphone8-ipa-sign.log
+          retention-days: 7
+          if-no-files-found: ignore
