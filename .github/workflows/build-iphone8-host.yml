@@ -1,4 +1,4 @@
-name: Build iPhone 8 standalone StikPair host (iOS 16)
+name: Build signed iPhone 8 standalone StikPair host (iOS 16)
 
 on:
   push:
@@ -47,6 +47,7 @@ jobs:
           xcrun --sdk iphoneos clang -target arm64-apple-ios16.0 \
             -isysroot "$SDK" -fobjc-arc -O2 \
             -I upstream/rust/include \
+            -Wl,-sectcreate,__TEXT,__info_plist,iphone8-host/Info.plist \
             iphone8-host/main.m \
             upstream/rust/target/aarch64-apple-ios/release/libstikpair_ffi.a \
             -framework Foundation -framework Security -framework SystemConfiguration \
@@ -54,18 +55,22 @@ jobs:
             -o output/StikPairHost-iPhone8 2>&1 | tee iphone8-link.log
           test -s output/StikPairHost-iPhone8
           file output/StikPairHost-iPhone8
+          codesign --force --sign - --timestamp=none output/StikPairHost-iPhone8
+          codesign -dvvv output/StikPairHost-iPhone8 2>&1 | tee iphone8-sign.log
+          codesign --verify --verbose=2 output/StikPairHost-iPhone8
+          cp iphone8-host/Info.plist output/Info.plist
 
       - name: Package executable
         run: |
           set -euo pipefail
           cp iphone8-host/README.md output/README.md
-          (cd output && zip -9 ../StikPairHost-iPhone8.zip StikPairHost-iPhone8 README.md)
+          (cd output && zip -9 ../StikPairHost-iPhone8.zip StikPairHost-iPhone8 Info.plist README.md)
           unzip -t StikPairHost-iPhone8.zip
 
       - name: Upload binary artifact
         uses: actions/upload-artifact@v4
         with:
-          name: StikPairHost-iPhone8-iOS16-arm64
+          name: StikPairHost-iPhone8-signed-iOS16-arm64
           path: StikPairHost-iPhone8.zip
           retention-days: 7
           if-no-files-found: error
@@ -78,5 +83,6 @@ jobs:
           path: |
             iphone8-rust-build.log
             iphone8-link.log
+            iphone8-sign.log
           retention-days: 7
           if-no-files-found: ignore
