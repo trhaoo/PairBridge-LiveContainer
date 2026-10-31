@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <string.h>
 #include "stikpair.h"
 
 @interface PairAdvertiser : NSObject <NSNetServiceDelegate>
@@ -27,7 +28,14 @@ static void ready_callback(void *ctx, const char *service_id, uint16_t port,
                            const char *const *keys, const char *const *vals, size_t count) {
     @autoreleasepool {
         if (!service_id) return;
+        if (strcmp(service_id, "__stikpair_tcp_accepted__") == 0) {
+            printf("[TCP] REAL CONNECTION ACCEPTED on port %u\n", port);
+            fflush(stdout);
+            return;
+        }
         NSString *name = [NSString stringWithUTF8String:service_id];
+        printf("[Bonjour] service instance=%s, host label=StikPair-iPhone8\n", service_id);
+        fflush(stdout);
         NSMutableDictionary<NSString *,NSData *> *txt = [NSMutableDictionary dictionary];
         for (size_t i=0; i<count; i++) {
             if (!keys || !vals || !keys[i] || !vals[i]) continue;
