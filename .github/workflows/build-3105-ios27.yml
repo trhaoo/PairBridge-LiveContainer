@@ -121,7 +121,7 @@ jobs:
           set -euo pipefail
           xcodebuild \
             -project upstream/ThreeOneOSFive.xcodeproj \
-            -scheme ThreeOneOSFive \
+            -scheme 3105 \
             -configuration Release \
             -sdk iphoneos \
             -destination 'generic/platform=iOS' \
