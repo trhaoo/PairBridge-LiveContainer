@@ -1,0 +1,191 @@
+name: Build 3105 iOS 27.0 LiveContainer IPA (unsigned)
+
+on:
+  push:
+    branches: [3105-ios27-compat-build]
+    paths:
+      - '.github/workflows/build-3105-ios27-livecontainer.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: xcode-27
+    timeout-minutes: 70
+    steps:
+      - name: Fetch original 3105 source (fixed revision)
+        uses: actions/checkout@v4
+        with:
+          repository: YangJiiii/3105
+          ref: a72617ed4c764a65d8aac1e91aca95231e72a2cb
+          path: upstream
+          persist-credentials: false
+
+      - name: Apply limited UI compatibility patch for final iOS 27.0
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          root = Path("upstream")
+          def replace(path, old, new):
+              f = root / path
+              source = f.read_text(encoding="utf-8")
+              if source.count(old) != 1:
+                  raise RuntimeError("Unexpected upstream source: " + path + " :: " + old[:80])
+              f.write_text(source.replace(old, new, 1), encoding="utf-8")
+              print("Patched", path)
+
+          policy = "ThreeOneOSFive/helpers/SupportPolicy.swift"
+          replace(policy,
+              '    static let verifiedIOS26Range = "26.0–26.6.1"\n',
+              '    static let verifiedIOS26Range = "26.0–26.6.1"\n'
+              '    // iOS 27.0 public build: app UI only, NOT verified exploit access.\n'
+              '    static let iOS27PublicReleaseBuild = "24A437"\n')
+          replace(policy,
+              '    static func iOS27BetaNumber(for build: String) -> Int? {\n',
+              '    static func isIOS27PublicRelease(major: Int, minor: Int, patch: Int, build: String) -> Bool {\n'
+              '        major == 27 && minor == 0 && patch == 0 && build == iOS27PublicReleaseBuild\n'
+              '    }\n\n'
+              '    static func iOS27BetaNumber(for build: String) -> Int? {\n')
+
+          app = "ThreeOneOSFive/App.swift"
+          replace(app,
+              '    @Published var unsupportedMessage: String?\n    @Published var kernelExploitRunning = false\n',
+              '    @Published var unsupportedMessage: String?\n'
+              '    @Published var isIOS27PublicReleaseCompatibility = false\n'
+              '    @Published var kernelExploitRunning = false\n')
+          replace(app,
+              '        unsupportedMessage = supported ? nil : "iOS \\(AppInfo.osVersion) (\\(AppInfo.osBuild))"\n'
+              '        if let unsupportedMessage {\n'
+              '            exploitStatus = .unsupported(unsupportedMessage)\n'
+              '            return\n'
+              '        }\n\n'
+              '        let applicable = KernelExploit.isApplicable(\n',
+              '        let releaseCompatibility = ExploitSupportPolicy.isIOS27PublicRelease(\n'
+              '            major: v.major, minor: v.minor, patch: v.patch, build: AppInfo.osBuild\n'
+              '        )\n'
+              '        isIOS27PublicReleaseCompatibility = releaseCompatibility\n'
+              '        unsupportedMessage = (supported || releaseCompatibility)\n'
+              '            ? nil : "iOS \\(AppInfo.osVersion) (\\(AppInfo.osBuild))"\n'
+              '        if let unsupportedMessage {\n'
+              '            exploitStatus = .unsupported(unsupportedMessage)\n'
+              '            return\n'
+              '        }\n'
+              '        if releaseCompatibility {\n'
+              '            exploitStatus = .unsupported("iOS 27.0 (24A437): kernel access not verified")\n'
+              '            log("compat: public iOS 27 UI enabled; elevated access unverified")\n'
+              '            return\n'
+              '        }\n\n'
+              '        let applicable = KernelExploit.isApplicable(\n')
+          replace(app,
+              '    func runKernelExploitIfNeeded() {\n        refreshKernelExploitStatus()\n',
+              '    func runKernelExploitIfNeeded() {\n'
+              '        guard kernelExploitApplicable else {\n'
+              '            log("compat: block unverified kernel exploit")\n'
+              '            return\n'
+              '        }\n'
+              '        refreshKernelExploitStatus()\n')
+
+          settings = "ThreeOneOSFive/views/SettingsView.swift"
+          replace(settings,
+              '                        Text(language.text(appState.isSupported ? "settings.supported" : "settings.unsupported"))\n'
+              '                        .foregroundStyle(appState.isSupported ? Color.green : Color.red)\n',
+              '                        if appState.isIOS27PublicReleaseCompatibility {\n'
+              '                            Text("Compatibility mode (limited)").foregroundStyle(.orange)\n'
+              '                        } else {\n'
+              '                            Text(language.text(appState.isSupported ? "settings.supported" : "settings.unsupported"))\n'
+              '                                .foregroundStyle(appState.isSupported ? Color.green : Color.red)\n'
+              '                        }\n')
+          replace(settings,
+              '                    LabeledContent("iOS 26", value: ExploitSupportPolicy.verifiedIOS26Range)\n',
+              '                    LabeledContent("iOS 26", value: ExploitSupportPolicy.verifiedIOS26Range)\n'
+              '                    if appState.isIOS27PublicReleaseCompatibility {\n'
+              '                        Text("iOS 27.0 public release: app UI only. Kernel access and system Patch not verified.")\n'
+              '                            .font(.footnote).foregroundStyle(.orange)\n'
+              '                    }\n')
+          # LiveContainer guest: the host owns the signing entitlements and
+          # original MobileHouseArrest identity cannot be delegated.
+          # On public iOS 27 use only the guest's own sandbox, not MCM enumeration.
+          appbrowser = "ThreeOneOSFive/views/AppDataBrowserView.swift"
+          replace(appbrowser,
+              '        DispatchQueue.global(qos: .userInitiated).async {\n'
+              '            let bundleMetadata = ContainerStore.applicationBundleMetadataCatalog()\n',
+              '        DispatchQueue.global(qos: .userInitiated).async {\n'
+              '            let v = AppInfo.versionTuple\n'
+              '            if ExploitSupportPolicy.isIOS27PublicRelease(\n'
+              '                major: v.major, minor: v.minor, patch: v.patch, build: AppInfo.osBuild\n'
+              '            ) {\n'
+              '                let local = InstalledApp(\n'
+              '                    bundleID: "com.trhaoo.3105.livecontainer.local",\n'
+              '                    name: "3105 / LiveContainer Local Files",\n'
+              '                    containerPath: NSHomeDirectory(),\n'
+              '                    version: "Sandbox",\n'
+              '                    icon: nil\n'
+              '                )\n'
+              '                DispatchQueue.main.async {\n'
+              '                    apps = [local]\n'
+              '                    isLoading = false\n'
+              '                    isResolving = false\n'
+              '                }\n'
+              '                return\n'
+              '            }\n'
+              '            let bundleMetadata = ContainerStore.applicationBundleMetadataCatalog()\n')
+
+          filebrowser = "ThreeOneOSFive/views/FileBrowserView.swift"
+          replace(filebrowser,
+              '            if shouldGrant {\n',
+              '            let v = AppInfo.versionTuple\n'
+              '            let inPublicIOS27Compat = ExploitSupportPolicy.isIOS27PublicRelease(\n'
+              '                major: v.major, minor: v.minor, patch: v.patch, build: AppInfo.osBuild\n'
+              '            )\n'
+              '            if shouldGrant && !inPublicIOS27Compat {\n')
+          print("LiveContainer version: local sandbox browsing added; privileged paths remain unverified.")
+          PY
+
+      - name: Show iOS toolchain
+        run: |
+          xcodebuild -version
+          xcodebuild -showsdks
+          xcodebuild -list -project upstream/ThreeOneOSFive.xcodeproj
+
+      - name: Build unsigned iOS app
+        shell: bash
+        run: |
+          set -euo pipefail
+          xcodebuild \
+            -project upstream/ThreeOneOSFive.xcodeproj \
+            -scheme 3105 \
+            -configuration Release \
+            -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath "$RUNNER_TEMP/3105-derived" \
+            PRODUCT_BUNDLE_IDENTIFIER=com.trhaoo.ThreeOneOSFive.LiveContainer \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            build
+
+      - name: Package IPA
+        shell: bash
+        run: |
+          set -euo pipefail
+          output="$RUNNER_TEMP/3105-derived/Build/Products/Release-iphoneos"
+          app="$(find "$output" -maxdepth 1 -type d -name '*.app' -print -quit)"
+          test -n "$app"
+          /usr/libexec/PlistBuddy -c "Set :CFBundleDisplayName 3105 LC" "$app/Info.plist"
+          /usr/libexec/PlistBuddy -c "Set :CFBundleIdentifier com.trhaoo.ThreeOneOSFive.LiveContainer" "$app/Info.plist"
+          mkdir -p "$RUNNER_TEMP/3105-package/Payload"
+          ditto "$app" "$RUNNER_TEMP/3105-package/Payload/$(basename "$app")"
+          (cd "$RUNNER_TEMP/3105-package" && zip -qry "$GITHUB_WORKSPACE/3105-ios27-livecontainer-unsigned.ipa" Payload)
+          unzip -l "$GITHUB_WORKSPACE/3105-ios27-livecontainer-unsigned.ipa" | head -30
+          test -s "$GITHUB_WORKSPACE/3105-ios27-livecontainer-unsigned.ipa"
+
+      - name: Upload built IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: 3105-ios27-livecontainer-unsigned
+          path: 3105-ios27-livecontainer-unsigned.ipa
+          retention-days: 14
+          if-no-files-found: error
